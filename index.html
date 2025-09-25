@@ -22,27 +22,24 @@
   }
   .game { display: none; align-items: center; gap: 16px; }
   .side {
-  width: var(--clock-w);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-#blackClock { transform: rotate(180deg); }
-#blackScore { transform: rotate(180deg); }
-
+    width: var(--clock-w);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
   .clock {
     width: 100%; text-align: center; font-size: 26px; font-weight: 800;
     padding: 10px 8px; border: 2px solid #333; border-radius: 12px;
   }
   #whiteClock { background: #fff; color: #000; }
   #blackClock { background: #000; color: #fff; transform: rotate(180deg); }
-  .score { margin-top: 8px; font-size: 14px; font-weight: 600; color: #333; }
+  .score { font-size: 14px; font-weight: 600; color: #333; }
   #blackScore { transform: rotate(180deg); }
   table { border-collapse: collapse; }
   td {
@@ -68,6 +65,9 @@
     <button onclick="startGame(5)">5 min</button>
     <button onclick="startGame(10)">10 min</button>
     <button onclick="startGame(15)">15 min</button>
+    <button onclick="startGame(20)">20 min</button>
+    <button onclick="startGame(30)">30 min</button>
+    <button onclick="startGame(0)">Sans chrono</button>
   </div>
 </div>
 
@@ -106,19 +106,60 @@ const PIECES = {
 
 const chess = new Chess();
 const board = document.getElementById("board");
-let selected=null, legalMoves=[], castleMoves={};
+let selected=null, legalMoves=[], castleMoves=[];
 let whiteTime=0, blackTime=0, baseTime=0;
 let turn="w", timer=null, gameStarted=false, gameOver=false;
 
 /* Pendules */
 function formatTime(sec){ const m=Math.floor(sec/60).toString().padStart(2,"0"); const s=(sec%60).toString().padStart(2,"0"); return `${m}:${s}`; }
-function updateClocks(){ document.getElementById("whiteClock").textContent=formatTime(whiteTime); document.getElementById("blackClock").textContent=formatTime(blackTime); }
-function startTimer(){ if(timer) clearInterval(timer); timer=setInterval(()=>{ if(gameOver){clearInterval(timer);return;} if(turn==="w"){whiteTime--;if(whiteTime<=0){whiteTime=0;updateClocks();timeOut("w");return;}} else {blackTime--;if(blackTime<=0){blackTime=0;updateClocks();timeOut("b");return;}} updateClocks();},1000);}
-function timeOut(side){ clearInterval(timer); gameOver=true; const winner=(side==="w"?"Noirs":"Blancs"); alert(`Temps écoulé : ${winner} gagnent !`); }
+function updateClocks(){ 
+  if (baseTime === 0) {
+    document.getElementById("whiteClock").textContent = "--:--";
+    document.getElementById("blackClock").textContent = "--:--";
+  } else {
+    document.getElementById("whiteClock").textContent = formatTime(whiteTime); 
+    document.getElementById("blackClock").textContent = formatTime(blackTime); 
+  }
+}
+
+function startTimer(){
+  if (baseTime === 0) return; // Sans chrono = pas de timer
+  if (timer) clearInterval(timer);
+  timer=setInterval(()=>{
+    if(gameOver){ clearInterval(timer); return; }
+    if(turn==="w"){
+      whiteTime--;
+      if(whiteTime<=0){ whiteTime=0; updateClocks(); timeOut("w"); return; }
+    } else {
+      blackTime--;
+      if(blackTime<=0){ blackTime=0; updateClocks(); timeOut("b"); return; }
+    }
+    updateClocks();
+  },1000);
+}
+function timeOut(side){ 
+  clearInterval(timer); 
+  gameOver=true; 
+  const winner=(side==="w"?"Noirs":"Blancs"); 
+  alert(`Temps écoulé : ${winner} gagnent !`); 
+}
 
 /* Plateau */
 function toSquare(i,j){ const f="abcdefgh"; return f[j]+(8-i); }
-function buildBoard(){ board.innerHTML=""; for(let i=0;i<8;i++){ const tr=document.createElement("tr"); for(let j=0;j<8;j++){ const td=document.createElement("td"); td.className=((i+j)%2===0)?"white":"black"; td.dataset.row=i; td.dataset.col=j; td.addEventListener("click",onCellClick); tr.appendChild(td);} board.appendChild(tr);} }
+function buildBoard(){ 
+  board.innerHTML=""; 
+  for(let i=0;i<8;i++){ 
+    const tr=document.createElement("tr"); 
+    for(let j=0;j<8;j++){ 
+      const td=document.createElement("td"); 
+      td.className=((i+j)%2===0)?"white":"black"; 
+      td.dataset.row=i; td.dataset.col=j; 
+      td.addEventListener("click",onCellClick); 
+      tr.appendChild(td);
+    } 
+    board.appendChild(tr);
+  } 
+}
 function drawBoard(){
   for(let i=0;i<8;i++){
     for(let j=0;j<8;j++){
@@ -144,8 +185,21 @@ function drawBoard(){
 
 /* Score matériel différentiel */
 const pieceVals={p:1,n:3,b:3,r:5,q:9,k:0};
-function evaluateMaterial(){ let w=0,b=0; for(const sq of chess.SQUARES){ const p=chess.get(sq); if(!p) continue; if(p.color==="w") w+=pieceVals[p.type]; else b+=pieceVals[p.type]; } return {w,b}; }
-function updateMaterialScores(){ const {w,b}=evaluateMaterial(); const diffW=w-b; const diffB=b-w; document.getElementById("whiteScore").textContent="Matériel: "+(diffW>0? "+"+diffW: diffW); document.getElementById("blackScore").textContent="Matériel: "+(diffB>0? "+"+diffB: diffB); }
+function evaluateMaterial(){ 
+  let w=0,b=0; 
+  for(const sq of chess.SQUARES){ 
+    const p=chess.get(sq); 
+    if(!p) continue; 
+    if(p.color==="w") w+=pieceVals[p.type]; else b+=pieceVals[p.type]; 
+  } 
+  return {w,b}; 
+}
+function updateMaterialScores(){ 
+  const {w,b}=evaluateMaterial(); 
+  const diffW=w-b; const diffB=b-w; 
+  document.getElementById("whiteScore").textContent="Matériel: "+(diffW>0? "+"+diffW: diffW); 
+  document.getElementById("blackScore").textContent="Matériel: "+(diffB>0? "+"+diffB: diffB); 
+}
 
 /* Clic */
 function onCellClick(e){
@@ -159,7 +213,12 @@ function onCellClick(e){
       if(!gameStarted){ gameStarted=true; turn="b"; startTimer(); }
       else { turn=(turn==="w"?"b":"w"); startTimer(); }
       selected=null; legalMoves=[]; castleMoves=[]; drawBoard();
-      if(chess.in_checkmate()){ clearInterval(timer); gameOver=true; alert("Échec et mat !"); return; }
+      if(chess.in_checkmate()){ 
+        clearInterval(timer); gameOver=true; 
+        const winner=(turn==="w"?"Noirs":"Blancs"); 
+        alert(`Échec et mat ! ${winner} gagnent !`); 
+        return; 
+      }
       else if(chess.in_draw()){ clearInterval(timer); gameOver=true; alert("Partie nulle !"); return; }
       return;
     }
@@ -186,13 +245,13 @@ function startGame(minutes){
   document.getElementById("menu").remove();
   document.getElementById("game").style.display="flex";
   baseTime=minutes*60;
-  whiteTime=baseTime; blackTime=baseTime;
+  if(minutes===0){ whiteTime=0; blackTime=0; } 
+  else { whiteTime=baseTime; blackTime=baseTime; }
   updateClocks();
-  buildBoard();
-  selected=null; legalMoves=[]; castleMoves=[]; // <-- s’assurer qu’on part de zéro
-  drawBoard(); // <-- affiche tout de suite les pièces de départ
+  buildBoard(); 
+  selected=null; legalMoves=[]; castleMoves=[];
+  drawBoard();
 }
-
 </script>
 </body>
 </html>
